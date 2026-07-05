@@ -1,0 +1,287 @@
+Box - filter::::
+
+
+
+
+import numpy as np
+from PIL import Image
+
+# n = 1 means a 3x3 filter
+n = 1
+
+# Load image, convert to grayscale, resize
+img = Image.open('images/cat.jpeg').convert('L').resize((640 // 2, 426 // 2))
+
+# Convert image to numpy array
+imgMat = np.array(img, dtype=np.uint8)
+
+def box_filter_pixel(i, j, mat):
+    diff = range(-n, n + 1)
+
+    pixel_sum = 0
+    count = 0
+
+    for dx in diff:
+        ni = i + dx
+
+        if 0 <= ni < mat.shape[0]:
+            for dy in diff:
+                nj = j + dy
+
+                if 0 <= nj < mat.shape[1]:
+                    pixel_sum += int(mat[ni][nj])
+                    count += 1
+
+    return pixel_sum // count
+
+# Create output image matrix
+filtered = imgMat.copy()
+
+# Apply box filter
+for i in range(imgMat.shape[0]):
+    for j in range(imgMat.shape[1]):
+        filtered[i][j] = box_filter_pixel(i, j, imgMat)
+
+# Ensure correct datatype
+filtered = filtered.astype(np.uint8)
+
+# Convert back to image
+final = Image.fromarray(filtered)
+
+# Display image
+final.show()
+
+final
+
+# Save image
+final.save('images/box.jpeg')
+
+print("Box filter applied successfully.")
+
+
+
+
+
+Gaussian filter::::::::
+
+
+
+
+
+import pandas as pd
+import numpy as np
+from PIL import Image
+
+def gaussian_kernel(size, sigma):
+    x = np.linspace(- (size // 2), size // 2, size)
+    x /= np.sqrt(2)*sigma
+    x2 = x**2
+    kernel = np.exp(- x2[:, None] - x2[None, :])
+    return kernel / kernel.sum()
+
+size = 7
+sigma = size / 6
+gauss = gaussian_kernel(size,sigma)
+gauss
+
+dx = dy = size // 2
+gaussMap = {}
+p = np.linspace(- (size // 2), size // 2, size).astype(int)
+for i in p:
+    for j in p:
+        gaussMap[(i,j)] = gauss[dx + i][dx + j]
+
+from collections import defaultdict
+def pointCalc(i,j,mat,gaussMap):
+    p = np.linspace(- (size // 2), size // 2, size).astype(int)
+    pixMap = defaultdict(int)
+    for dx in p:
+        if i + dx >= 0 and i + dx < len(mat):
+            for dy in p:
+                if j + dy >= 0 and j + dy < len(mat[0]):
+                    pixMap[(dx,dy)] = mat[i+dx][j+dy]
+    res = 0
+    for dx in p:
+        for dy in p:
+            res += gaussMap[(dx,dy)] * pixMap[(dx,dy)]
+    return res
+
+img = Image.open('images/cat.jpeg').convert('L').resize((640 // 2,426 // 2))
+img
+
+imgMat = np.array(img)
+imgMat
+
+gausImg = imgMat.copy()
+for i in range(len(imgMat)):
+    for j in range(len(imgMat[0])):
+        gausImg[i][j] = pointCalc(i,j,imgMat,gaussMap)
+        # print(boxxed[i][j],imgMat[i][j])
+
+final = Image.fromarray(gausImg)
+
+final
+
+final.save('images/gauss.jpeg')
+
+
+
+
+laplace filter:::::::::
+
+
+
+
+import pandas as pd
+import numpy as np
+from PIL import Image
+
+img = Image.open('images/comet.png').convert('L').resize((640 // 2,426 // 2))
+img
+
+imgMat = np.array(img)
+imgMat
+
+lap_kernel = np.array([[0,1,0],[1,-4,1],[0,1,0]]) 
+
+lapMat = imgMat.copy() 
+for i in range(1,len(imgMat) - 1): #iterate over rows, skipping borders
+    for j in range(1,len(imgMat[0]) - 1): #iterate over columns, skipping borders
+        value = lap_kernel * imgMat[(i - 1):(i + 2), (j - 1):(j + 2)] #element-wise multiplication, selects exactly 3 rows: i - 1, i, and i + 1(syntax= start:stop, stops at stop-1)
+        lapMat[i][j] = min(max(0,value.sum()),255) #summation of the 9 values, clip to [0,255]
+        # if value.sum() < 0:
+        #     lapMat[i][j] = 0
+        # elif value.sum() > 255:
+        #     lapMat[i][j] = 255
+        # else:
+        #     lapMat[i][j] = value.sum()
+
+fin = Image.fromarray(lapMat)
+#image after summation and clipping with the kernel
+
+fin
+
+fin.save('images/lap1.jpeg')
+
+# performs image sharpening
+lapMat = imgMat.copy()
+for i in range(1,len(imgMat) - 1):
+    for j in range(1,len(imgMat[0]) - 1):
+        value = lap_kernel * imgMat[(i - 1):(i + 2), (j - 1):(j + 2)]
+        lapMat[i][j] = min(max(0,imgMat[i][j] -  value.sum()),255) #sharpening by subtracting the laplacian from the original image, clip to [0,255]
+        # if imgMat[i][j] - value.sum() < 0:
+        #     lapMat[i][j] = 0
+        # elif imgMat[i][j] - value.sum() > 255:
+        #     lapMat[i][j] = 255
+        # else:
+        #     lapMat[i][j] = imgMat[i][j] - value.sum() ,, if positive center add ,if negative subtract
+
+fin = Image.fromarray(lapMat)
+
+fin
+
+fin.save('images/lap2.jpeg')
+
+
+
+median filter:::::::
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+from PIL import Image
+
+img = Image.open('images/panda.jpeg').convert('L').resize((640 // 2,426 // 2))
+img
+
+imgMat = np.array(img)
+imgMat
+
+size = 5
+np.linspace(- (size // 2), size // 2, size).astype(int)
+
+size = 5
+def getMedian(i,j,mat):
+    p = np.linspace(- (size // 2), size // 2, size).astype(int)
+    arr = []
+    for dx in p:
+        if i + dx >= 0 and i + dx < len(mat):
+            for dy in p:
+                if j + dy >= 0 and j + dy < len(mat[0]):
+                    arr.append(mat[i+dx][j+dy]) #append the value of the pixel at (i+dx, j+dy) to the array
+    return np.median(arr) #return the median value of the array
+
+medMat = imgMat.copy()
+for i in range(len(imgMat)):
+    for j in range(len(imgMat[0])):
+        medMat[i][j] = getMedian(i,j,imgMat)
+
+final = Image.fromarray(medMat)
+
+final
+
+final.save('images/median.jpeg')
+
+
+
+unsharp masking :::::::
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+from PIL import Image
+
+img = Image.open('images/moon.png').convert('L').resize((250,250))
+img
+
+imgMat = np.array(img, dtype=np.int32)
+imgMat
+
+Blur using box filter
+
+n = 5
+def nineMul(i,j,mat):
+    diff = [x for x in range(-n,n+1)]
+    ct = 0
+    prod = 0
+    for dx in diff:
+        if (i + dx) >= 0 and (i + dx) < len(mat):
+            for dy in diff:
+                if (j + dy) >= 0 and (j + dy) < len(mat[0]):
+                    ct += 1
+                    prod += mat[i + dx][j + dy]
+    return prod // ct
+
+blurMat = imgMat.copy()
+for i in range(len(imgMat)):
+    for j in range(len(imgMat[0])):
+        blurred = nineMul(i, j, imgMat)
+        blurMat[i][j] = min(max(0,imgMat[i][j] - blurred),255) #clipping the values to be between 0 and 255
+
+fin = Image.fromarray(blurMat.astype(np.uint8))
+
+fin.save('images/unsharp1.jpeg')
+
+# highboost/unsharp masking using k value
+blurMat = imgMat.copy()
+k = 1
+for i in range(len(imgMat)):
+    for j in range(len(imgMat[0])):
+        blurred = nineMul(i, j, imgMat)
+        blurMat[i][j] = min(max(0,imgMat[i][j] + k*(imgMat[i][j] -  blurred)),255)
+
+fin = Image.fromarray(blurMat.astype(np.uint8))
+
+fin
+
+fin.save('images/unsharp2.jpeg')
+
+
